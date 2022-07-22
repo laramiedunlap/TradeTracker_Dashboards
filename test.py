@@ -49,8 +49,40 @@ if service != 'Select':
             st.write("---")
             trade_df = (get_trades_df(user_service))
             st.table(trade_df)
-            # Here I would allow people to verify the table and make sure everything looks okay
+            # Here I would allow people to verify the table and make sure everything looks okay -- or add an edit trades option
             trade_df.to_csv(f"{user_service.name}_open_trades.csv")
+
+
     elif user_action == "View Open Trades":
+        # read in csv of open trades
         trade_df = pd.read_csv(f"{user_service.name}_open_trades.csv")
-        st.table(trade_df)
+        trades = st.sidebar.selectbox("What would you like to view?", ("Open Stock Trades", "Open Options Trades"))
+        # split off into stock and options
+        stock_df = trade_df[trade_df['is_option']== False]
+        option_df = trade_df[trade_df['is_option']== True]
+        # set index
+        stock_df.set_index(stock_df.columns[0], inplace=True)
+        option_df.set_index(option_df.columns[0], inplace=True)
+        # drop unimportant columns from dfs
+        cols_stock = ["long_short", "entry_price", "current_price"]
+        cols_option = ["long_short", "entry_price", "current_price", "expiration", "strike", "current_price"]
+        stock_df = stock_df[[c for c in stock_df.columns if c in cols_stock]]
+        option_df = option_df[[c for c in option_df.columns if c in cols_option]]
+
+        def calc_p_l(row):
+            if row['long_short'] == "Long":
+                return row['current_price'] - row['entry_price']
+            else:  
+                return row['entry_price'] - row['current_price']
+        
+        stock_df['P/L'] = stock_df.apply( lambda row: calc_p_l(row), axis=1)
+        option_df['P/L'] = option_df.apply( lambda row: calc_p_l(row), axis=1)
+
+        stock_df['P/L%'] = stock_df['P/L']/stock_df['entry_price']
+        option_df['P/L%'] = option_df['P/L']/option_df['entry_price']
+
+
+        if trades == "Open Stock Trades":
+            st.dataframe(stock_df)
+        elif trades == "Open Options Trades":
+            st.dataframe(option_df)
